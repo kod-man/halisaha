@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
+import { DragDropContext, Draggable, Droppable, DropResult } from "react-beautiful-dnd";
 
 type Squad = {
   date: string;
@@ -67,13 +67,17 @@ export default function Home() {
 
   const handleAddPlayer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPlayer.trim()) return;
+    if (!newPlayer.trim()) {
+      return;
+    }
     setAlternativeSquad([...alternativeSquad, newPlayer.trim()]);
     setNewPlayer("");
   };
 
-  const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) {
+      return;
+    }
 
     const sourceId = result.source.droppableId;
     const destId = result.destination.droppableId;
@@ -91,9 +95,13 @@ export default function Home() {
       const [removed] = team.splice(sourceIndex, 1);
       team.splice(destIndex, 0, removed);
 
-      if (sourceId === "teamA") setTeamA(team);
-      else if (sourceId === "teamB") setTeamB(team);
-      else setAlternativeSquad(team);
+      if (sourceId === "teamA") {
+        setTeamA(team);
+      } else if (sourceId === "teamB") {
+        setTeamB(team);
+      } else {
+        setAlternativeSquad(team);
+      }
     } else {
       // Takımlar arası transfer
       const sourceTeam =
@@ -108,13 +116,21 @@ export default function Home() {
       const [removed] = sourceTeam.splice(sourceIndex, 1);
       destTeam.splice(destIndex, 0, removed);
 
-      if (sourceId === "teamA") setTeamA(sourceTeam);
-      else if (sourceId === "teamB") setTeamB(sourceTeam);
-      else setAlternativeSquad(sourceTeam);
+      if (sourceId === "teamA") {
+        setTeamA(sourceTeam);
+      } else if (sourceId === "teamB") {
+        setTeamB(sourceTeam);
+      } else {
+        setAlternativeSquad(sourceTeam);
+      }
 
-      if (destId === "teamA") setTeamA(destTeam);
-      else if (destId === "teamB") setTeamB(destTeam);
-      else setAlternativeSquad(destTeam);
+      if (destId === "teamA") {
+        setTeamA(destTeam);
+      } else if (destId === "teamB") {
+        setTeamB(destTeam);
+      } else {
+        setAlternativeSquad(destTeam);
+      }
     }
   };
 
