@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("POSTGRES_PRISMA_URL") // uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+}
+
+model Squad {
+  id        Int      @id @default(autoincrement())
+  date      String
+  teamA     String[] // JSON array of player names
+  teamB     String[] // JSON array of player names
+  alternativeSquad String[] // JSON array of player names
+  createdAt DateTime @default(now())
+}
+
+model AlternativePlayer {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+} 
