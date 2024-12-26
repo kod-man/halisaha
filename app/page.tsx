@@ -18,19 +18,21 @@ const Draggable = dynamic(() => import("react-beautiful-dnd").then((mod) => mod.
 });
 
 const getStoredTeams = () => {
-  if (typeof window === "undefined") return { teamA: [], teamB: [] };
+  if (typeof window === "undefined") return { teamA: [], teamB: [], lastResetDate: null };
 
   try {
     const savedTeamA = localStorage.getItem("teamA");
     const savedTeamB = localStorage.getItem("teamB");
+    const lastResetDate = localStorage.getItem("lastResetDate");
 
     return {
       teamA: savedTeamA ? JSON.parse(savedTeamA) : [],
       teamB: savedTeamB ? JSON.parse(savedTeamB) : [],
+      lastResetDate: lastResetDate ? new Date(lastResetDate) : null,
     };
   } catch (error) {
     console.error("Error loading teams from localStorage:", error);
-    return { teamA: [], teamB: [] };
+    return { teamA: [], teamB: [], lastResetDate: null };
   }
 };
 
@@ -47,11 +49,18 @@ const getNextFriday = () => {
     friday.setDate(today.getDate() + (5 - dayOfWeek));
   }
 
-  return friday.toLocaleDateString("tr-TR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  return friday;
+};
+
+const shouldResetTeams = (lastResetDate: Date | null) => {
+  if (!lastResetDate) return true;
+
+  const today = new Date();
+  const lastFriday = new Date(lastResetDate);
+  const nextFriday = getNextFriday();
+
+  // Eğer son sıfırlama tarihinden sonraki Cuma günü geçtiyse
+  return today > lastFriday && today.getTime() >= nextFriday.getTime();
 };
 
 export default function Home() {
@@ -61,9 +70,18 @@ export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState<"teamA" | "teamB">("teamA");
 
   useEffect(() => {
-    const { teamA: savedTeamA, teamB: savedTeamB } = getStoredTeams();
-    setTeamA(savedTeamA);
-    setTeamB(savedTeamB);
+    const { teamA: savedTeamA, teamB: savedTeamB, lastResetDate } = getStoredTeams();
+
+    if (shouldResetTeams(lastResetDate)) {
+      // Takımları sıfırla ve yeni sıfırlama tarihini kaydet
+      setTeamA([]);
+      setTeamB([]);
+      localStorage.setItem("lastResetDate", new Date().toISOString());
+    } else {
+      // Mevcut takımları yükle
+      setTeamA(savedTeamA);
+      setTeamB(savedTeamB);
+    }
   }, []);
 
   useEffect(() => {
@@ -137,7 +155,14 @@ export default function Home() {
         <h1 className="text-4xl font-bold text-center text-gray-900 mb-2">
           Halısaha Organizasyonu
         </h1>
-        <div className="text-center text-gray-600 mb-8">{getNextFriday()} • 21:30-22:30</div>
+        <div className="text-center text-gray-600 mb-8">
+          {getNextFriday().toLocaleDateString("tr-TR", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          })}{" "}
+          • 21:30-22:30
+        </div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
