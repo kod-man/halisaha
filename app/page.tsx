@@ -1,327 +1,241 @@
 "use client";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { DragDropContext, Draggable, Droppable, DropResult } from "react-beautiful-dnd";
 
-type Squad = {
-  date: string;
-  teamA: string[];
-  teamB: string[];
-  alternativeSquad: string[];
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+import type { DropResult } from "react-beautiful-dnd";
+
+const DragDropContext = dynamic(
+  () => import("react-beautiful-dnd").then((mod) => mod.DragDropContext),
+  { ssr: false },
+);
+
+const Droppable = dynamic(() => import("react-beautiful-dnd").then((mod) => mod.Droppable), {
+  ssr: false,
+});
+
+const Draggable = dynamic(() => import("react-beautiful-dnd").then((mod) => mod.Draggable), {
+  ssr: false,
+});
+
+const getStoredTeams = () => {
+  if (typeof window === "undefined") return { teamA: [], teamB: [] };
+
+  try {
+    const savedTeamA = localStorage.getItem("teamA");
+    const savedTeamB = localStorage.getItem("teamB");
+
+    return {
+      teamA: savedTeamA ? JSON.parse(savedTeamA) : [],
+      teamB: savedTeamB ? JSON.parse(savedTeamB) : [],
+    };
+  } catch (error) {
+    console.error("Error loading teams from localStorage:", error);
+    return { teamA: [], teamB: [] };
+  }
 };
 
-const INITIAL_PLAYERS = [
-  "Mehmet abi",
-  "Ahmet ikiz",
-  "Orhan Abi",
-  "Cafer abi",
-  "Mesut abi",
-  "Ibrahim abi",
-  "Ufuk abi",
-  "Ilhan Hasselt",
-  "Ilkay abi",
-  "Savas abi",
-  "Isa abi",
-  "Ilyas abi",
-];
-
-// İlk 6 oyuncu Takım A'ya, diğer 6 oyuncu Takım B'ye
-const INITIAL_TEAM_A = INITIAL_PLAYERS.slice(0, 6);
-const INITIAL_TEAM_B = INITIAL_PLAYERS.slice(6, 12);
-const MAX_PAST_SQUADS = 2; // Son 2 hafta
-
 export default function Home() {
-  const [teamA, setTeamA] = useState(INITIAL_TEAM_A);
-  const [teamB, setTeamB] = useState(INITIAL_TEAM_B);
-  const [alternativeSquad, setAlternativeSquad] = useState<string[]>([]);
-  const [newPlayer, setNewPlayer] = useState("");
-  const [pastSquads, setPastSquads] = useState<Squad[]>([]);
+  const [teamA, setTeamA] = useState<string[]>([]);
+  const [teamB, setTeamB] = useState<string[]>([]);
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState<"teamA" | "teamB">("teamA");
 
-  // LocalStorage'dan verileri yükle
   useEffect(() => {
-    const savedPastSquads = localStorage.getItem("pastSquads");
-    const savedAlternativeSquad = localStorage.getItem("alternativeSquad");
-
-    if (savedPastSquads) {
-      setPastSquads(JSON.parse(savedPastSquads));
-    }
-    if (savedAlternativeSquad) {
-      setAlternativeSquad(JSON.parse(savedAlternativeSquad));
-    }
+    const { teamA: savedTeamA, teamB: savedTeamB } = getStoredTeams();
+    setTeamA(savedTeamA);
+    setTeamB(savedTeamB);
   }, []);
 
-  // Verileri localStorage'a kaydet
   useEffect(() => {
-    localStorage.setItem("pastSquads", JSON.stringify(pastSquads));
-  }, [pastSquads]);
+    if (typeof window === "undefined") return;
 
-  useEffect(() => {
-    localStorage.setItem("alternativeSquad", JSON.stringify(alternativeSquad));
-  }, [alternativeSquad]);
-
-  const currentDate = new Date().toLocaleDateString("tr-TR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+    try {
+      localStorage.setItem("teamA", JSON.stringify(teamA));
+      localStorage.setItem("teamB", JSON.stringify(teamB));
+    } catch (error) {
+      console.error("Error saving teams to localStorage:", error);
+    }
+  }, [teamA, teamB]);
 
   const handleAddPlayer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPlayer.trim()) {
-      return;
+    if (!newPlayerName.trim()) return;
+
+    if (selectedTeam === "teamA") {
+      setTeamA([...teamA, newPlayerName]);
+    } else {
+      setTeamB([...teamB, newPlayerName]);
     }
-    setAlternativeSquad([...alternativeSquad, newPlayer.trim()]);
-    setNewPlayer("");
+
+    setNewPlayerName("");
   };
 
   const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) {
-      return;
-    }
+    if (!result.destination) return;
 
     const sourceId = result.source.droppableId;
     const destId = result.destination.droppableId;
     const sourceIndex = result.source.index;
     const destIndex = result.destination.index;
 
+    // Aynı takım içinde sıralama
     if (sourceId === destId) {
-      // Aynı takım içinde sıralama değişikliği
-      const team =
-        sourceId === "teamA"
-          ? [...teamA]
-          : sourceId === "teamB"
-          ? [...teamB]
-          : [...alternativeSquad];
+      const team = sourceId === "teamA" ? [...teamA] : [...teamB];
       const [removed] = team.splice(sourceIndex, 1);
       team.splice(destIndex, 0, removed);
 
       if (sourceId === "teamA") {
         setTeamA(team);
-      } else if (sourceId === "teamB") {
+      } else {
         setTeamB(team);
-      } else {
-        setAlternativeSquad(team);
       }
+      return;
+    }
+
+    // Takımlar arası transfer
+    const sourceTeam = sourceId === "teamA" ? [...teamA] : [...teamB];
+    const destTeam = destId === "teamA" ? [...teamA] : [...teamB];
+    const [removed] = sourceTeam.splice(sourceIndex, 1);
+    destTeam.splice(destIndex, 0, removed);
+
+    if (sourceId === "teamA") {
+      setTeamA(sourceTeam);
     } else {
-      // Takımlar arası transfer
-      const sourceTeam =
-        sourceId === "teamA"
-          ? [...teamA]
-          : sourceId === "teamB"
-          ? [...teamB]
-          : [...alternativeSquad];
-      const destTeam =
-        destId === "teamA" ? [...teamA] : destId === "teamB" ? [...teamB] : [...alternativeSquad];
+      setTeamB(sourceTeam);
+    }
 
-      const [removed] = sourceTeam.splice(sourceIndex, 1);
-      destTeam.splice(destIndex, 0, removed);
-
-      if (sourceId === "teamA") {
-        setTeamA(sourceTeam);
-      } else if (sourceId === "teamB") {
-        setTeamB(sourceTeam);
-      } else {
-        setAlternativeSquad(sourceTeam);
-      }
-
-      if (destId === "teamA") {
-        setTeamA(destTeam);
-      } else if (destId === "teamB") {
-        setTeamB(destTeam);
-      } else {
-        setAlternativeSquad(destTeam);
-      }
+    if (destId === "teamA") {
+      setTeamA(destTeam);
+    } else {
+      setTeamB(destTeam);
     }
   };
 
-  const saveCurrentSquad = () => {
-    const currentSquad: Squad = {
-      date: currentDate,
-      teamA: [...teamA],
-      teamB: [...teamB],
-      alternativeSquad: [...alternativeSquad],
-    };
-
-    // Son 2 haftayı tut
-    const updatedSquads = [currentSquad, ...pastSquads].slice(0, MAX_PAST_SQUADS);
-    setPastSquads(updatedSquads);
-  };
-
   return (
-    <div className="min-h-screen p-4 sm:p-8 bg-gray-50">
-      {/* Üst Navigasyon */}
-      <div className="fixed top-4 right-4 z-50 flex gap-4">
-        <Link
-          href="/past-squads"
-          className="bg-white px-4 py-2 rounded-lg shadow-md hover:bg-gray-50"
-        >
-          Geçmiş Kadrolar
-        </Link>
-        <Link
-          href="/alternative-players"
-          className="bg-white px-4 py-2 rounded-lg shadow-md hover:bg-gray-50"
-        >
-          Alternatif Oyuncular
-        </Link>
-      </div>
-
-      <main className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-4">Halısaha Organizasyonu</h1>
-        <h2 className="text-xl text-center mb-8 text-gray-600">{currentDate}</h2>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4">
+        <h1 className="text-4xl font-bold text-center text-gray-900 mb-8">
+          Halısaha Organizasyonu
+        </h1>
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Takım A */}
-            <Droppable droppableId="teamA">
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="bg-white p-6 rounded-lg shadow-md"
-                >
-                  <h2 className="text-xl font-semibold mb-4">Takım A ({teamA.length}/6)</h2>
-                  <ul className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <section className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Takım A ({teamA.length}/6)</h2>
+              <Droppable droppableId="teamA">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`space-y-3 min-h-[300px] p-4 rounded-lg ${
+                      snapshot.isDraggingOver ? "bg-blue-50" : "bg-gray-50"
+                    }`}
+                  >
                     {teamA.map((player, index) => (
                       <Draggable key={player} draggableId={`teamA-${player}`} index={index}>
-                        {(provided) => (
-                          <li
+                        {(provided, snapshot) => (
+                          <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded cursor-move"
+                            className={`flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border ${
+                              snapshot.isDragging
+                                ? "border-blue-500 shadow-lg"
+                                : "border-gray-200 hover:shadow-md"
+                            } transition-all duration-200`}
                           >
-                            <span>{player}</span>
+                            <span className="text-gray-700 font-medium">{player}</span>
                             <button
                               onClick={() => {
                                 const newTeamA = teamA.filter((_, i) => i !== index);
                                 setTeamA(newTeamA);
-                                setAlternativeSquad([...alternativeSquad, player]);
                               }}
-                              className="text-red-500 hover:text-red-700"
+                              className="px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200"
                             >
                               Sil
                             </button>
-                          </li>
+                          </div>
                         )}
                       </Draggable>
                     ))}
                     {provided.placeholder}
-                  </ul>
-                </div>
-              )}
-            </Droppable>
+                  </div>
+                )}
+              </Droppable>
+            </section>
 
-            {/* Takım B */}
-            <Droppable droppableId="teamB">
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="bg-white p-6 rounded-lg shadow-md"
-                >
-                  <h2 className="text-xl font-semibold mb-4">Takım B ({teamB.length}/6)</h2>
-                  <ul className="space-y-2">
+            <section className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Takım B ({teamB.length}/6)</h2>
+              <Droppable droppableId="teamB">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`space-y-3 min-h-[300px] p-4 rounded-lg ${
+                      snapshot.isDraggingOver ? "bg-blue-50" : "bg-gray-50"
+                    }`}
+                  >
                     {teamB.map((player, index) => (
                       <Draggable key={player} draggableId={`teamB-${player}`} index={index}>
-                        {(provided) => (
-                          <li
+                        {(provided, snapshot) => (
+                          <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded cursor-move"
+                            className={`flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border ${
+                              snapshot.isDragging
+                                ? "border-blue-500 shadow-lg"
+                                : "border-gray-200 hover:shadow-md"
+                            } transition-all duration-200`}
                           >
-                            <span>{player}</span>
+                            <span className="text-gray-700 font-medium">{player}</span>
                             <button
                               onClick={() => {
                                 const newTeamB = teamB.filter((_, i) => i !== index);
                                 setTeamB(newTeamB);
-                                setAlternativeSquad([...alternativeSquad, player]);
                               }}
-                              className="text-red-500 hover:text-red-700"
+                              className="px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200"
                             >
                               Sil
                             </button>
-                          </li>
+                          </div>
                         )}
                       </Draggable>
                     ))}
                     {provided.placeholder}
-                  </ul>
-                </div>
-              )}
-            </Droppable>
+                  </div>
+                )}
+              </Droppable>
+            </section>
           </div>
-
-          {/* Alternatif Kadro */}
-          <Droppable droppableId="alternative">
-            {(provided) => (
-              <div
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-                className="mt-8 bg-white p-6 rounded-lg shadow-md"
-              >
-                <h2 className="text-xl font-semibold mb-4">Alternatif Kadro</h2>
-                <ul className="space-y-2">
-                  {alternativeSquad.map((player, index) => (
-                    <Draggable key={player} draggableId={`alt-${player}`} index={index}>
-                      {(provided) => (
-                        <li
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded cursor-move"
-                        >
-                          <span>{player}</span>
-                          <button
-                            onClick={() => {
-                              const newSquad = alternativeSquad.filter((_, i) => i !== index);
-                              setAlternativeSquad(newSquad);
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            Sil
-                          </button>
-                        </li>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </ul>
-              </div>
-            )}
-          </Droppable>
         </DragDropContext>
 
-        {/* Oyuncu Ekleme Formu */}
-        <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Yeni Oyuncu Ekle</h2>
-          <form onSubmit={handleAddPlayer} className="flex gap-4">
+        <form onSubmit={handleAddPlayer} className="mt-8 max-w-2xl mx-auto">
+          <div className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200">
             <input
               type="text"
-              value={newPlayer}
-              onChange={(e) => setNewPlayer(e.target.value)}
-              placeholder="Oyuncu adı"
-              className="flex-1 p-2 border rounded"
+              value={newPlayerName}
+              onChange={(e) => setNewPlayerName(e.target.value)}
+              placeholder="Oyuncu Adı"
+              className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             />
+            <select
+              value={selectedTeam}
+              onChange={(e) => setSelectedTeam(e.target.value as "teamA" | "teamB")}
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+            >
+              <option value="teamA">Takım A</option>
+              <option value="teamB">Takım B</option>
+            </select>
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              className="px-6 py-2.5 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
             >
               Ekle
             </button>
-          </form>
-        </div>
-
-        {/* Kadroyu Kaydet */}
-        <div className="mt-8 flex justify-center mb-8">
-          <button
-            onClick={saveCurrentSquad}
-            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold"
-          >
-            Kadroyu Kaydet
-          </button>
-        </div>
-      </main>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
