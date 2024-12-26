@@ -34,6 +34,26 @@ const getStoredTeams = () => {
   }
 };
 
+const getNextFriday = () => {
+  const today = new Date();
+  const friday = new Date(today);
+  const dayOfWeek = today.getDay(); // 0 = Pazar, 1 = Pazartesi, ..., 5 = Cuma
+
+  // Eğer bugün Cuma'dan sonraki bir günse, gelecek Cuma'ya git
+  if (dayOfWeek >= 5) {
+    friday.setDate(today.getDate() + (7 - dayOfWeek + 5));
+  } else {
+    // Eğer bugün Cuma'dan önceki bir günse, bu haftanın Cuma'sına git
+    friday.setDate(today.getDate() + (5 - dayOfWeek));
+  }
+
+  return friday.toLocaleDateString("tr-TR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+};
+
 export default function Home() {
   const [teamA, setTeamA] = useState<string[]>([]);
   const [teamB, setTeamB] = useState<string[]>([]);
@@ -114,9 +134,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-4xl font-bold text-center text-gray-900 mb-8">
+        <h1 className="text-4xl font-bold text-center text-gray-900 mb-2">
           Halısaha Organizasyonu
         </h1>
+        <div className="text-center text-gray-600 mb-8">{getNextFriday()} • 21:30-22:30</div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
